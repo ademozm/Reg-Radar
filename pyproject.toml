@@ -1,0 +1,12 @@
+[tool.ruff]
+target-version = "py312"
+line-length = 120
+exclude = ["venv", ".venv", "__pycache__"]
+
+[tool.ruff.lint]
+# E: pycodestyle hatalar, F: pyflakes (kullanılmayan import/değişken, tanımsız isim vb.),
+# I: import sıralaması, UP: eski Python sözdizimi yerine yeni önerileri.
+select = ["E", "F", "I", "UP"]
+ignore = [
+    "E501",  # satır uzunluğu - line-length zaten 120, bazı uzun log/mesaj satırları için esnek davranıyoruz
+]

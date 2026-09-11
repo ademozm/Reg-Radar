@@ -1,0 +1,14 @@
+# Sabit (==) sürüm yerine minimum (>=) sürüm kullanıyoruz - önceki denemede
+# yfinance==0.2.44'e sabitlemek, kütüphanenin daha sonraki hata düzeltmelerini
+# almanızı engellemişti. `pip install -r requirements.txt` her çalıştırıldığında
+# en azından bu sürümlerin ÜSTÜNDEKİ bir şeyi kurar.
+streamlit>=1.38.0
+yfinance>=0.2.50
+sqlalchemy>=2.0.35
+python-dotenv>=1.0.1
+pandas>=2.2.3
+platformdirs>=4.0.0
+apscheduler>=3.10.4
+requests>=2.31.0
+tzdata>=2024.1
+pytest>=8.3.3

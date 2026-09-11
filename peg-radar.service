@@ -1,0 +1,29 @@
+# systemd servis şablonu - PEG Radar'ı Docker KULLANMADAN, doğrudan bir
+# Linux sunucuda (VPS, kendi bilgisayarınız vb.) arka planda ve sunucu
+# yeniden başlasa bile otomatik ayağa kalkacak şekilde çalıştırır.
+#
+# KURULUM:
+#   1. Projeyi sunucuya klonlayın/kopyalayın, örn: /opt/peg-radar
+#   2. O klasörde: python3 -m venv venv && venv/bin/pip install -r requirements.txt
+#   3. Aşağıdaki <KULLANICI_ADI> ve /opt/peg-radar kısımlarını kendinize göre düzenleyin
+#   4. Bu dosyayı /etc/systemd/system/peg-radar.service olarak kaydedin
+#   5. sudo systemctl daemon-reload
+#   6. sudo systemctl enable --now peg-radar
+#   7. Durumu kontrol edin: sudo systemctl status peg-radar
+#   8. Logları izleyin: journalctl -u peg-radar -f
+
+[Unit]
+Description=PEG Radar - Peter Lynch tarzi hisse tarama sitesi
+After=network.target
+
+[Service]
+Type=simple
+User=<KULLANICI_ADI>
+WorkingDirectory=/opt/peg-radar
+EnvironmentFile=/opt/peg-radar/.env
+ExecStart=/opt/peg-radar/venv/bin/streamlit run app.py --server.port=8501 --server.address=0.0.0.0 --server.headless=true
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

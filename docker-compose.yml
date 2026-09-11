@@ -1,0 +1,11 @@
+services:
+  peg-radar:
+    build: .
+    ports:
+      - "8501:8501"
+    env_file:
+      - .env
+    volumes:
+      # SQLite veritabanı konteyner yeniden başlasa/güncellense bile kalıcı olsun
+      - ./peg_radar.db:/app/peg_radar.db
+    restart: unless-stopped
