@@ -1,0 +1,80 @@
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+    branches: ["**"]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Python kur
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Bağımlılıkları kur (uygulama + dev araçları)
+        run: pip install -r requirements-dev.txt
+
+      - name: Sözdizimi kontrolü (tüm .py dosyaları)
+        run: python -m py_compile $(find . -name "*.py" -not -path "./venv/*" -not -path "./.venv/*")
+
+      - name: Lint (ruff)
+        run: ruff check .
+
+      - name: Testler (ağsız, sahte veriyle)
+        run: pytest tests/ -v
+
+  docker-smoke-test:
+    runs-on: ubuntu-latest
+    needs: test
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Docker Buildx kur (katman önbellekleme için)
+        uses: docker/setup-buildx-action@v3
+
+      - name: Docker imajını build et
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          load: true
+          tags: peg-radar:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Konteyneri başlat
+        run: |
+          docker run -d --name peg-radar-ci \
+            -p 8501:8501 \
+            -e APP_PASSWORD= \
+            -e DATABASE_URL=sqlite:///./peg_radar.db \
+            peg-radar:ci
+
+      - name: Sağlık kontrolü - Streamlit gerçekten ayağa kalkıyor mu
+        run: |
+          for i in $(seq 1 20); do
+            if curl -sf http://localhost:8501/_stcore/health > /dev/null; then
+              echo "OK - konteyner sağlıklı yanıt verdi (deneme $i)"
+              exit 0
+            fi
+            echo "Henüz hazır değil, 3 saniye sonra tekrar denenecek (deneme $i/20)"
+            sleep 3
+          done
+          echo "HATA: konteyner 60 saniye içinde sağlıklı hale gelmedi"
+          exit 1
+
+      - name: Konteyner loglarını göster (her durumda, hata ayıklama için)
+        if: always()
+        run: docker logs peg-radar-ci || true
+
+      - name: Konteyneri temizle
+        if: always()
+        run: docker rm -f peg-radar-ci || true
