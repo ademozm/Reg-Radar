@@ -106,6 +106,8 @@ def get_app_settings() -> dict:
             "watchlist_us": row.watchlist_us,
             "watchlist_tr": row.watchlist_tr,
             "auto_scan_enabled": row.auto_scan_enabled,
+            "last_us_notification_at": row.last_us_notification_at,
+            "last_tr_notification_at": row.last_tr_notification_at,
         }
     finally:
         db.close()

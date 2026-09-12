@@ -88,6 +88,17 @@ duran bir iş parçacığı (APScheduler) ile yapılıyor. Bu şu anlama gelir:
 değişiklikler otomatik taramaya yansımaz - otomatik tarama her zaman
 **kaydedilmiş** (veritabanındaki) listeyi kullanır.
 
+### Borsa kapanışını beklemeden test etme
+
+Sol panelde **"🧪 Otomatik taramayı borsa kapanışını beklemeden test et"**
+başlığını açın. Buradaki butonlar cron zamanlayıcısının tetikleyeceği
+**AYNI fonksiyonu** (`scheduled_us_scan` / `scheduled_tr_scan`) çağırır -
+kaydedilmiş listeyi tarar, veritabanına yazar, Telegram kuruluysa bildirim
+gönderir. Yani gerçek saatleri (16:15, 18:10) beklemeden tüm otomasyon
+zincirinin uçtan uca çalıştığını hemen doğrulayabilirsiniz. Aynı panelde
+sıradaki gerçek çalışma zamanlarını da (`Sıradaki ABD taraması: ...`)
+görürsünüz - zamanlayıcının doğru saatlere kurulduğunu buradan teyit edin.
+
 ## İsteğe bağlı (manuel) tarama
 
 Otomatik taramaya ek olarak, sol panelde her zaman "Taramayı şimdi
@@ -105,6 +116,10 @@ bulundu, hangileri) loglanır. İsterseniz Telegram'a da göndertebilirsiniz:
 3. Tarayıcıda `https://api.telegram.org/bot<TOKEN>/getUpdates` adresine
    gidin, dönen JSON'da `"chat":{"id": ...}` kısmındaki sayıyı
    `TELEGRAM_CHAT_ID`'ye yapıştırın.
+4. Uygulamayı yeniden başlatın (`.env` değişiklikleri için gerekli).
+5. Sol paneldeki test bölümünde **"Sadece test bildirimi gönder"**
+   butonuna basın - tarama yapmadan, sadece bağlantıyı doğrular. Birkaç
+   saniye içinde Telegram'da bir mesaj görmelisiniz.
 
 Bu alanlar boş bırakılırsa bildirim gönderilmez, sadece log'a yazılır -
 bildirim kurmak zorunlu değildir.
@@ -123,33 +138,72 @@ Otomatik günlük taramanın gerçekten güvenilir olması için uygulama
 sürecinin 7/24 açık kalması gerekiyor (yukarıdaki "Otomatik tarama"
 bölümüne bakın). Hangi seçeneğin size uygun olduğu şuna bağlı:
 
-| Seçenek | Günlük otomatik tarama için güvenilir mi? | Ne zaman uygun |
-|---|---|---|
-| GitHub Codespaces | ❌ Hayır - hareketsizlikte uyur | Sadece geliştirme/test |
-| Streamlit Community Cloud | ⚠️ Kısmen - trafik azsa uyuyabilir | Manuel taramaya bakmak için, günlük otomasyon için garanti değil |
-| Küçük bir VPS (Docker veya systemd) | ✅ Evet | Gerçekten her gün otomatik çalışmasını istiyorsanız |
-| Kendi bilgisayarınız, sürekli açık | ✅ Evet (bilgisayar kapanmadığı sürece) | VPS'e gerek duymuyorsanız |
+| Seçenek | Günlük otomatik tarama için güvenilir mi? | Ücret | Ne zaman uygun |
+|---|---|---|---|
+| GitHub Codespaces | ❌ Hayır - hareketsizlikte uyur | Aylık ücretsiz kota var, sonra ücretli | Sadece geliştirme/test |
+| Streamlit Community Cloud | ⚠️ Kısmen - trafik azsa uyuyabilir | Ücretsiz | Manuel taramaya bakmak için, günlük otomasyon için garanti değil |
+| **Oracle Cloud Always Free** | ✅ Evet | **Kalıcı ücretsiz** (deneme değil) | Gerçekten her gün otomatik çalışsın, hiç ödeme yapmadan |
+| Kiralık bir VPS (Hetzner, DigitalOcean vb.) | ✅ Evet | Ücretli (aylık ~$4-6) | Oracle'ın kayıt süreciyle uğraşmak istemiyorsanız |
+| Kendi bilgisayarınız, sürekli açık | ✅ Evet (bilgisayar kapanmadığı sürece) | Ücretsiz (elektrik hariç) | VPS'e hiç gerek duymuyorsanız |
 
-### Seçenek A: VPS'te Docker ile (önerilen)
+### Seçenek A (ücretsiz, önerilen): Oracle Cloud Always Free + Docker
 
-```bash
-# Sunucuda (Ubuntu için örnek):
-git clone <repo-url> peg-radar && cd peg-radar
-cp .env.example .env    # isterseniz düzenleyin
-docker compose up -d --build
-```
+Oracle Cloud'un "Always Free" katmanı, deneme süresi dolunca ücretlendirmeye
+dönüşen diğer sağlayıcıların (AWS, GCP'nin çoğu kampanyası) aksine
+**gerçekten kalıcı olarak ücretsiz** - süre sınırı yok. Yeterli güçte bir
+ARM sunucu (4 çekirdek, 24 GB RAM'e kadar - bu proje için fazlasıyla yeterli)
+veriyor. Dürüst olmak gerekirse: kayıt sırasında kredi kartı istiyor
+(ücretlendirmek için değil, doğrulama için) ve bazı kullanıcılar kayıt/
+doğrulama sürecinde zaman zaman sıkıntı yaşadığını bildiriyor - sabır
+gerekebilir.
 
-`restart: unless-stopped` ayarı sayesinde sunucu yeniden başlasa veya
-konteyner çökse bile otomatik ayağa kalkar - otomatik taramanın
-güvenilirliği için bu önemli. Logları izlemek için: `docker compose logs -f`
+1. https://www.oracle.com/cloud/free/ adresinden hesap açın.
+2. Console'da **Compute → Instances → Create Instance**.
+3. Image olarak **Ubuntu** (22.04 veya 24.04), Shape olarak **"Ampere" (ARM, Always Free uygun)** seçin - "Always Free eligible" etiketli olanı seçtiğinizden emin olun, aksi halde ücretlendirilebilir.
+4. SSH anahtarınızı ekleyin (Oracle otomatik oluşturabilir, indirin).
+5. Instance oluşunca verilen genel (public) IP'ye SSH ile bağlanın:
+   ```bash
+   ssh -i indirdiğiniz-anahtar.key ubuntu@<INSTANCE_IP>
+   ```
+6. Sunucuda Docker'ı kurun:
+   ```bash
+   curl -fsSL https://get.docker.com | sh
+   sudo usermod -aG docker $USER
+   # Bu komuttan sonra SSH oturumunu kapatıp tekrar açın (grup değişikliği için)
+   ```
+7. Projeyi çekin ve çalıştırın:
+   ```bash
+   git clone https://github.com/<kullanıcı-adınız>/<repo-adı>.git peg-radar
+   cd peg-radar
+   cp .env.example .env   # isterseniz düzenleyin (Telegram token'ları vb.)
+   docker compose up -d --build
+   ```
+8. **Önemli:** Oracle'ın güvenlik duvarı (Security List) varsayılan olarak 8501 portunu kapalı tutar. Console'da instance'ınızın bağlı olduğu **VCN → Security Lists → Default Security List → Add Ingress Rule** ile TCP 8501 portunu açın (Source CIDR: `0.0.0.0/0`).
+9. Tarayıcıda `http://<INSTANCE_IP>:8501` adresine gidin.
 
-### Seçenek B: VPS'te Docker'sız (systemd ile)
+Bundan sonra bu sunucu 7/24 açık kalır, siz bilgisayarınızı kapatsanız
+bile otomatik tarama çalışmaya devam eder - tam da istediğiniz şey bu.
+
+**Alternatif (aynı şekilde kalıcı ücretsiz):** Google Cloud'un `e2-micro`
+Always Free instance'ı (sadece belirli ABD bölgelerinde) - kurulum adımları
+neredeyse birebir aynı, sadece Console arayüzü farklı.
+
+### Seçenek B: Kiralık bir VPS (Docker ile, ücretli ama kayıt daha kolay)
+
+Oracle'ın kayıt sürecinden kaçınmak isterseniz Hetzner veya DigitalOcean
+gibi bir sağlayıcıdan aylık birkaç dolara bir sunucu kiralayabilirsiniz -
+kurulum adımları yukarıdakiyle birebir aynı (Docker kur → `git clone` →
+`docker compose up -d --build`), sadece 8. adımdaki güvenlik duvarı
+ayarı sağlayıcıya göre değişir (genelde "Firewall" veya "Security Group"
+bölümünden 8501 portunu açarsınız).
+
+### Seçenek C: VPS'te Docker'sız (systemd ile)
 
 Docker kullanmak istemiyorsanız `peg-radar.service` dosyasındaki
 talimatları izleyin - aynı "sunucu yeniden başlasa bile otomatik kalkar"
 garantisini systemd ile sağlar.
 
-### Seçenek C: Streamlit Community Cloud (ücretsiz, ama günlük otomasyon garantisiz)
+### Seçenek D: Streamlit Community Cloud (ücretsiz, ama günlük otomasyon garantisiz)
 
 1. Bu klasörü bir GitHub reposuna yükleyin (private tutabilirsiniz).
 2. https://share.streamlit.io adresinden GitHub hesabınızla giriş yapın.
@@ -253,14 +307,16 @@ pytest tests/ -v
 ```
 
 `tests/test_lynch_strategy.py` checklist mantığını (PEG hesaplama, eşik
-kontrolleri, piyasa tespiti, yeniden deneme davranışı) sahte veriyle
-test ediyor. `tests/test_notifications.py` bildirim özeti metninin doğru
-oluşturulduğunu test ediyor. İkisi de **ağ kullanmadan** çalışır. **Bu
-sandbox'ta internet erişimi kapalı olduğu için `pip install` yapılamadı,
-dolayısıyla testler burada fiilen çalıştırılamadı** — sözdizimi kontrol
-edildi ve mantık elden geçirildi, ama kendi ortamınızda `pytest tests/ -v`
-ile doğrulamanız gerekiyor. Gerçek yfinance/Streamlit/APScheduler
-entegrasyonu da bu sandbox'ta hiç denenmedi.
+kontrolleri, piyasa tespiti, yeniden deneme davranışı, yüzde alanı
+normalizasyonu) sahte veriyle test ediyor. `tests/test_notifications.py`
+bildirim özeti metninin doğru oluşturulduğunu, `tests/test_scheduler.py`
+otomatik tarama orkestrasyonunun ("kapalıyken hiç taramamalı", "boş
+listede hata vermemeli" gibi) davranışlarını test ediyor. Üçü de **ağ
+kullanmadan**, mock'larla çalışır. **Bu sandbox'ta internet erişimi
+kapalı olduğu için `pip install` yapılamadı, dolayısıyla testler burada
+fiilen çalıştırılamadı** — sözdizimi kontrol edildi ve mantık elden
+geçirildi, ama artık GitHub Actions CI'ınız her push'ta bunları gerçekten
+çalıştırıp doğruluyor.
 
 ## Bilinçli olarak dışarıda bırakılanlar
 

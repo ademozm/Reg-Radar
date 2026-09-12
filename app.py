@@ -17,7 +17,8 @@ from lynch_strategy import (
     persist_scan_result,
     scan_symbol,
 )
-from scheduler import get_scheduler
+from notifications import notify
+from scheduler import get_scheduler, scheduled_tr_scan, scheduled_us_scan
 
 st.set_page_config(page_title="PEG Radar", page_icon="🧭", layout="wide")
 init_db()
@@ -107,6 +108,51 @@ with st.sidebar:
         "(aşağıdaki 'Kaydet' butonuyla kaydedin) ve uygulama sürecinin sürekli "
         "açık olmasını gerektirir - detaylar için README."
     )
+
+    # Zamanlayıcının gerçekten doğru saatlere kurulduğunu, borsa kapanışını
+    # beklemeden görebilmeniz için sıradaki çalışma zamanlarını gösteriyoruz.
+    _jobs = {j.id: j for j in get_scheduler().get_jobs()}
+    _us_next = _jobs["us_market_close_scan"].next_run_time if "us_market_close_scan" in _jobs else None
+    _tr_next = _jobs["tr_market_close_scan"].next_run_time if "tr_market_close_scan" in _jobs else None
+    st.caption(
+        f"📅 Sıradaki ABD taraması: {_us_next.strftime('%d.%m.%Y %H:%M %Z') if _us_next else '—'}  \n"
+        f"📅 Sıradaki Türkiye taraması: {_tr_next.strftime('%d.%m.%Y %H:%M %Z') if _tr_next else '—'}"
+    )
+    if persisted["last_us_notification_at"] or persisted["last_tr_notification_at"]:
+        st.caption(
+            f"Son otomatik ABD taraması: {persisted['last_us_notification_at'].strftime('%d.%m %H:%M') if persisted['last_us_notification_at'] else '—'}  \n"
+            f"Son otomatik Türkiye taraması: {persisted['last_tr_notification_at'].strftime('%d.%m %H:%M') if persisted['last_tr_notification_at'] else '—'}"
+        )
+
+    with st.expander("🧪 Otomatik taramayı borsa kapanışını beklemeden test et"):
+        st.caption(
+            "Bu butonlar, cron zamanlayıcısının borsa kapanışında yapacağı İŞLEMİN "
+            "TAMAMEN AYNISINI (kaydedilmiş izleme listesini tarar, DB'ye yazar, "
+            "Telegram kuruluysa bildirim gönderir) şimdi tetikler - saatleri "
+            "beklemeden tüm otomasyon zincirini uçtan uca doğrulamak için."
+        )
+        test_col1, test_col2 = st.columns(2)
+        if test_col1.button("ABD taramasını şimdi tetikle", use_container_width=True):
+            with st.spinner("Otomatik ABD taraması çalışıyor (gerçek zamanlanmış taramayla birebir aynı kod)..."):
+                scheduled_us_scan()
+            st.success("Tamamlandı - Telegram kuruluysa bildirimi kontrol edin.")
+            st.rerun()
+        if test_col2.button("Türkiye taramasını şimdi tetikle", use_container_width=True):
+            with st.spinner("Otomatik Türkiye taraması çalışıyor (gerçek zamanlanmış taramayla birebir aynı kod)..."):
+                scheduled_tr_scan()
+            st.success("Tamamlandı - Telegram kuruluysa bildirimi kontrol edin.")
+            st.rerun()
+
+        st.divider()
+        if settings.TELEGRAM_BOT_TOKEN and settings.TELEGRAM_CHAT_ID:
+            if st.button("Sadece test bildirimi gönder (tarama yapmadan)", use_container_width=True):
+                notify("🧪 PEG Radar test bildirimi - Telegram bağlantınız çalışıyor.")
+                st.success("Gönderildi - Telegram'ı kontrol edin. Birkaç saniye içinde gelmeli.")
+        else:
+            st.caption(
+                "Telegram kurulu değil (.env'de TELEGRAM_BOT_TOKEN/TELEGRAM_CHAT_ID "
+                "boş) - bildirimler sadece log'a yazılıyor. Kurulum için README'ye bakın."
+            )
 
     st.divider()
     st.subheader("İzleme listesi")
